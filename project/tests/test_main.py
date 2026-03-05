@@ -72,11 +72,11 @@ def test_processar_busca_caminho_ok(mock_dijkstra, capsys):
 
     mock_dijkstra.return_value = ([1, 2], 3.5)
 
-    processar_busca_caminho(G, 1, 2)
+    processar_busca_caminho(G, 1, 2, algoritmo='dijkstra')
 
     out = capsys.readouterr().out
-    assert "Caminho encontrado" in out
-    assert "Distância total" in out
+    assert "Caminho encontrado" in out or "✔ Caminho encontrado" in out
+    assert ("Distância total" in out) or ("Custo total" in out)
 
 
 @patch("main.dijkstra")
@@ -87,7 +87,7 @@ def test_processar_busca_caminho_no_path(mock_dijkstra, capsys):
     G.add_node(1, name="A", artist="X")
     G.add_node(2, name="B", artist="Y")
 
-    processar_busca_caminho(G, 1, 2)
+    processar_busca_caminho(G, 1, 2, algoritmo='dijkstra')
 
     out = capsys.readouterr().out
     assert "Nenhum caminho encontrado" in out

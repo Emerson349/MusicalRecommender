@@ -159,10 +159,13 @@ def test_process_graph_dataset_triggers_sampling(tmp_path):
 
     big_df = []
     for i in range(40):
-        row = df.iloc[i % len(df)].copy()
-        row["track_id"] = str(1000 + i)  
-        row["track_genre"] = "pop"       
-        big_df.append(row)
+            row = df.iloc[i % len(df)].copy()
+            row["track_id"] = str(1000 + i)
+            # Garante unicidade para não ser removido na limpeza (drop_duplicates)
+            row["track_name"] = f"Song_pop_{i}"
+            row["artists"] = f"Artist_{i}"
+            row["track_genre"] = "pop"
+            big_df.append(row)
 
     big_df = pd.DataFrame(big_df)
     big_df.to_csv(raw, index=False)

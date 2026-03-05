@@ -30,12 +30,19 @@ py project/main.py
 ```
 
 6. **Executar Testes**
+Navegue até a pasta do projeto.
 
 ```Bash
-   pytest --cov=tests --cov-report=term-missing -v
+   pytest --cov=src --cov-report=term-missing -q
+```
+Gerar relatório html
+
+```Bash
+   pytest --cov=src --cov-report=html
 ```
 
 7. **Plotar Gráficos**
+Navegue até a pasta do projeto.
 
 ```Bash
    python -m src.evaluation.benchmark_run --n 50 --seed 42
