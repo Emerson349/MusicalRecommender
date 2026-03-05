@@ -1,5 +1,4 @@
 import pandas as pd
-import numpy as np
 import networkx as nx
 from sklearn.preprocessing import MinMaxScaler
 from scipy.spatial.distance import cdist
@@ -11,15 +10,6 @@ METRICAS_SUPORTADAS = ('euclidean', 'cityblock', 'cosine')
 # ---------------------------------------------------------------------------
 # Pesos por feature musical
 # ---------------------------------------------------------------------------
-# Quanto maior o peso, mais aquela dimensão influencia a distância entre
-# duas músicas. Ajuste aqui para mudar o "conceito" de similaridade.
-#
-#   energy / valence   → definem a "vibe" emocional da música
-#   danceability       → ritmo percebido
-#   tempo              → BPM — peso menor para não dominar as demais features
-#   acousticness       → timbre (acústico vs. elétrico)
-#   instrumentalness   → presença de voz — menor peso pois é muito esparso
-#
 FEATURE_WEIGHTS = {
     'energy':            1.5,
     'valence':           1.5,
@@ -29,20 +19,10 @@ FEATURE_WEIGHTS = {
     'instrumentalness':  0.6,
 }
 
-# ---------------------------------------------------------------------------
-# Configurações do One-Hot de gênero
-# ---------------------------------------------------------------------------
 # Peso aplicado às colunas de gênero após One-Hot Encoding.
-# Mantido baixo para influenciar a similaridade sem criar componentes
-# desconexos no grafo — especialmente importante com K pequeno.
 GENRE_WEIGHT = 0.5
 
-# ---------------------------------------------------------------------------
-# Penalidade de gênero nas arestas
-# ---------------------------------------------------------------------------
-# Multiplicador aplicado ao peso da aresta quando os dois nós pertencem
-# a gêneros diferentes. Valor próximo de 1.0 para não cortar pontes entre
-# gêneros distantes (ex: metal → pop).
+# Multiplicador aplicado ao peso da aresta quando os nós são de gêneros diferentes.
 GENRE_EDGE_PENALTY = 1.1
 
 
@@ -52,25 +32,17 @@ class GraphBuilder:
     Usa K-Nearest Neighbors (K-NN) com métrica de distância configurável.
 
     Melhorias de similaridade:
-        - Gênero incluído como feature via One-Hot Encoding (ponderado por
-          ``GENRE_WEIGHT``).
-        - Pesos individuais por feature numérica (``FEATURE_WEIGHTS``).
-        - Penalidade adicional nas arestas entre músicas de gêneros distintos
-          (``GENRE_EDGE_PENALTY``).
+        - Gênero incluído como feature via One-Hot Encoding (GENRE_WEIGHT).
+        - Pesos individuais por feature numérica (FEATURE_WEIGHTS).
+        - Penalidade adicional nas arestas entre músicas de gêneros distintos.
+        - Features numéricas normalizadas salvas como atributos dos nós,
+          permitindo que a heurística do A* funcione mesmo após carregar
+          o grafo do disco via GraphML.
 
-    Métricas disponíveis:
-        - ``'euclidean'``  — Distância Euclidiana (padrão).
-        - ``'cityblock'``  — Distância de Manhattan.
-        - ``'cosine'``     — Similaridade do Cosseno (convertida em distância).
+    Métricas disponíveis: ``'euclidean'``, ``'cityblock'``, ``'cosine'``.
     """
 
     def __init__(self, csv_path: str):
-        """
-        Inicializa o construtor de grafo com o caminho do dataset.
-
-        Args:
-            csv_path: Path do dataset CSV de músicas processado.
-        """
         self.csv_path = csv_path
         self.G = nx.DiGraph()
         self.df = None
@@ -80,21 +52,14 @@ class GraphBuilder:
     # ------------------------------------------------------------------
 
     @staticmethod
-    def _build_feature_matrix(df: pd.DataFrame) -> pd.DataFrame:
+    def _normalize_numeric(df: pd.DataFrame):
         """
-        Constrói a matriz de features usada para calcular distâncias.
+        Aplica Min-Max Scaling nas features numéricas.
 
-        Etapas:
-          1. Seleciona features numéricas e aplica Min-Max Scaling.
-          2. Multiplica cada coluna pelo seu peso em ``FEATURE_WEIGHTS``.
-          3. Se ``track_genre`` existir, gera One-Hot Encoding e pondera
-             pelo ``GENRE_WEIGHT``.
-
-        Args:
-            df: DataFrame indexado por ``track_id`` com as colunas brutas.
-
-        Returns:
-            DataFrame com as features prontas para ``cdist``.
+        Retorna dois DataFrames com o mesmo índice:
+          - ``data_norm``: features normalizadas (valores em [0, 1]).
+          - ``data_weighted``: features normalizadas × FEATURE_WEIGHTS,
+            usadas para calcular distâncias.
         """
         numeric_cols = [c for c in FEATURE_WEIGHTS if c in df.columns]
         if not numeric_cols:
@@ -105,7 +70,6 @@ class GraphBuilder:
 
         data_numeric = df[numeric_cols].copy().dropna()
 
-        # 1. Normalização Min-Max
         scaler = MinMaxScaler()
         data_norm = pd.DataFrame(
             scaler.fit_transform(data_numeric),
@@ -113,18 +77,25 @@ class GraphBuilder:
             index=data_numeric.index,
         )
 
-        # 2. Pesos por feature
-        for col in data_norm.columns:
-            data_norm[col] *= FEATURE_WEIGHTS.get(col, 1.0)
+        data_weighted = data_norm.copy()
+        for col in data_weighted.columns:
+            data_weighted[col] *= FEATURE_WEIGHTS[col]
 
-        # 3. One-Hot Encoding do gênero
-        if 'track_genre' in df.columns:
-            genre_series = df.loc[data_norm.index, 'track_genre'].fillna('unknown')
-            genre_dummies = pd.get_dummies(genre_series, prefix='genre').astype(float)
-            genre_dummies *= GENRE_WEIGHT
-            data_norm = pd.concat([data_norm, genre_dummies], axis=1)
+        return data_norm, data_weighted
 
-        return data_norm
+    @staticmethod
+    def _add_genre_onehot(data_weighted: pd.DataFrame, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        Concatena colunas One-Hot do gênero (ponderadas por GENRE_WEIGHT)
+        à matriz de features ponderadas.
+        """
+        if 'track_genre' not in df.columns:
+            return data_weighted
+
+        genre_series = df.loc[data_weighted.index, 'track_genre'].fillna('unknown')
+        genre_dummies = pd.get_dummies(genre_series, prefix='genre').astype(float)
+        genre_dummies *= GENRE_WEIGHT
+        return pd.concat([data_weighted, genre_dummies], axis=1)
 
     # ------------------------------------------------------------------
     # API pública
@@ -142,16 +113,10 @@ class GraphBuilder:
         Args:
             k_neighbors: Número de vizinhos mais próximos para cada nó.
             save_path: Path opcional para salvar o grafo em GraphML.
-            metrica: Métrica de distância — ``'euclidean'``, ``'cityblock'``
-                     ou ``'cosine'``.
+            metrica: ``'euclidean'``, ``'cityblock'`` ou ``'cosine'``.
 
         Returns:
             Um ``nx.DiGraph`` com músicas como nós e distâncias como arestas.
-
-        Raises:
-            FileNotFoundError: Se o CSV não existir.
-            ValueError: Se o dataset não tiver colunas válidas ou a métrica
-                        for inválida.
         """
         if metrica not in METRICAS_SUPORTADAS:
             raise ValueError(
@@ -169,12 +134,13 @@ class GraphBuilder:
             self.df.set_index('track_id', inplace=True)
 
         print(f"-> Carregadas {len(self.df)} músicas.")
-
-        # Monta a matriz de features (numérico + gênero One-Hot)
         print("-> Construindo matriz de features (pesos + One-Hot gênero)...")
-        data_features = self._build_feature_matrix(self.df)
 
-        # Calcula matriz de distâncias
+        # data_norm  → valores em [0,1], usados como atributos dos nós
+        # data_features → ponderado + One-Hot, usado para cdist
+        data_norm, data_weighted = self._normalize_numeric(self.df)
+        data_features = self._add_genre_onehot(data_weighted, self.df)
+
         metrica_label = 'Manhattan' if metrica == 'cityblock' else metrica.capitalize()
         print(f"-> Calculando distâncias ({metrica_label})...")
         dist_matrix = cdist(data_features, data_features, metric=metrica)
@@ -185,31 +151,39 @@ class GraphBuilder:
             columns=data_features.index,
         )
 
-        # Cria nós e arestas
         print(f"-> Criando arestas (K={k_neighbors}, penalidade de gênero ativa)...")
         self.G = nx.DiGraph()
 
         has_genre = 'track_genre' in self.df.columns
+        numeric_cols = list(data_norm.columns)  # features a salvar nos nós
         count = 0
         total = len(data_features)
 
         for song_id in data_features.index:
             row = self.df.loc[song_id]
-            nome = row.get('track_name', 'Unknown')
-            artista = row.get('artists', 'Unknown')
             genre = row.get('track_genre', '') if has_genre else ''
 
-            self.G.add_node(song_id, name=nome, artist=artista, genre=genre)
+            # --- Atributos do nó ---
+            # Metadados descritivos
+            node_attrs = {
+                'name':   row.get('track_name', 'Unknown'),
+                'artist': row.get('artists', 'Unknown'),
+                'genre':  genre,
+            }
+            # Features numéricas normalizadas (necessárias para a heurística
+            # do A* funcionar mesmo após recarregar o grafo do GraphML)
+            for feat in numeric_cols:
+                node_attrs[feat] = float(data_norm.loc[song_id, feat])
 
+            self.G.add_node(song_id, **node_attrs)
+
+            # --- Arestas K-NN ---
             vizinhos = df_dist.loc[song_id].nsmallest(k_neighbors + 1).iloc[1:]
-
             for vizinho_id, distancia in vizinhos.items():
-                # Penalidade extra entre gêneros diferentes
                 if has_genre:
                     genre_viz = self.df.loc[vizinho_id].get('track_genre', '')
                     if genre != genre_viz:
                         distancia *= GENRE_EDGE_PENALTY
-
                 self.G.add_edge(song_id, vizinho_id, weight=distancia)
 
             count += 1
@@ -228,12 +202,7 @@ class GraphBuilder:
         return self.G
 
     def save_graph(self, output_path: str) -> None:
-        """
-        Salva o grafo em formato GraphML (.graphml).
-
-        Args:
-            output_path: Path completo do arquivo de saída.
-        """
+        """Salva o grafo em formato GraphML."""
         if not self.G or len(self.G) == 0:
             print("[AVISO] Grafo vazio. Nada salvo.")
             return
@@ -248,18 +217,7 @@ class GraphBuilder:
 
     @staticmethod
     def load_graph(input_path: str) -> nx.DiGraph:
-        """
-        Carrega um arquivo GraphML do disco.
-
-        Args:
-            input_path: Path completo do arquivo GraphML.
-
-        Returns:
-            Um ``nx.DiGraph``.
-
-        Raises:
-            FileNotFoundError: Se o arquivo não existir.
-        """
+        """Carrega um arquivo GraphML do disco."""
         if not os.path.exists(input_path):
             raise FileNotFoundError(f"Arquivo não encontrado: {input_path}")
 
