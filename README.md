@@ -35,4 +35,11 @@ py project/main.py
    pytest --cov=tests --cov-report=term-missing -v
 ```
 
-*Desenvolvido para a disciplina de Grafos/IA.*
+7. **Plotar Gráficos**
+
+```Bash
+   python -m src.evaluation.benchmark_run --n 50 --seed 42
+   python -m src.evaluation.benchmark_run --n 50 --seed 42 --penalizar
+```
+
+*Desenvolvido para a disciplina de IA.*
