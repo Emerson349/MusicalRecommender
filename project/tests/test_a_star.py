@@ -1,5 +1,6 @@
 # project/tests/test_a_star.py
 import math
+import runpy
 import pytest
 import networkx as nx
 
@@ -95,3 +96,27 @@ def test_a_star_penalizacao_aumenta_custo():
     _, cost_pen = search_mod.a_star(G, "A", "D", penalizar=True)
 
     assert cost_pen > cost_no
+
+
+def test_a_star_ignora_entrada_repetida_na_fila():
+    G = nx.Graph()
+    G.add_edge("A", "B", weight=5.0)
+    G.add_edge("A", "C", weight=1.0)
+    G.add_edge("C", "B", weight=1.0)
+    G.add_edge("B", "D", weight=1.0)
+    G.add_edge("C", "D", weight=100.0)
+
+    path, cost = search_mod.a_star(G, "A", "D", penalizar=False)
+
+    assert path == ["A", "C", "B", "D"]
+    assert cost == pytest.approx(3.0)
+
+
+def test_main_executa_sem_abrir_janela(monkeypatch):
+    monkeypatch.setattr("matplotlib.pyplot.show", lambda: None)
+    search_mod.main()
+
+
+def test_bloco_main_quando_modulo_executado_como_script(monkeypatch):
+    monkeypatch.setattr("matplotlib.pyplot.show", lambda: None)
+    runpy.run_module("src.algorithm.search", run_name="__main__")
