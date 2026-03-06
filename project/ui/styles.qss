@@ -1,0 +1,222 @@
+/*
+ * ui/styles.qss — Estilos QSS de referência (estilo Spotify)
+ *
+ * NOTA: A interface gráfica principal utiliza Flask + HTML/CSS/JS
+ * (arquivo ui/static/index.html). Este arquivo QSS está disponível
+ * caso o projeto migre para PyQt6/PySide6 no futuro.
+ *
+ * Para usar com PyQt6:
+ *   with open('ui/styles.qss', 'r') as f:
+ *       app.setStyleSheet(f.read())
+ */
+
+/* ===== Paleta base ===== */
+QMainWindow, QWidget {
+    background-color: #121212;
+    color: #FFFFFF;
+    font-family: "Segoe UI", "SF Pro Display", sans-serif;
+    font-size: 14px;
+}
+
+/* ===== Sidebar ===== */
+QFrame#sidebar {
+    background-color: #000000;
+    border-right: 1px solid #282828;
+    min-width: 240px;
+    max-width: 240px;
+}
+
+/* ===== Botões de navegação ===== */
+QPushButton.nav-button {
+    background: transparent;
+    border: none;
+    color: #b3b3b3;
+    text-align: left;
+    padding: 10px 16px;
+    border-radius: 6px;
+    font-weight: 500;
+}
+
+QPushButton.nav-button:hover {
+    background-color: #282828;
+    color: #FFFFFF;
+}
+
+QPushButton.nav-button:checked {
+    color: #FFFFFF;
+    font-weight: 700;
+}
+
+/* ===== Campo de busca ===== */
+QLineEdit#search-input {
+    background-color: #282828;
+    border: 2px solid transparent;
+    border-radius: 500px;
+    padding: 10px 16px 10px 40px;
+    color: #FFFFFF;
+    font-size: 14px;
+}
+
+QLineEdit#search-input:focus {
+    border-color: #1DB954;
+    background-color: #3E3E3E;
+}
+
+QLineEdit#search-input::placeholder {
+    color: #6a6a6a;
+}
+
+/* ===== Lista de músicas ===== */
+QListWidget#song-list {
+    background: transparent;
+    border: none;
+}
+
+QListWidget#song-list::item {
+    padding: 10px 14px;
+    border-radius: 6px;
+}
+
+QListWidget#song-list::item:hover {
+    background-color: #282828;
+}
+
+QListWidget#song-list::item:selected {
+    background-color: #1DB954;
+    color: #000000;
+}
+
+/* ===== Botão principal (Gerar) ===== */
+QPushButton#btn-generate {
+    background-color: #1DB954;
+    color: #000000;
+    font-weight: 700;
+    font-size: 15px;
+    border: none;
+    border-radius: 500px;
+    padding: 14px 32px;
+    min-height: 48px;
+}
+
+QPushButton#btn-generate:hover {
+    background-color: #1ed760;
+}
+
+QPushButton#btn-generate:disabled {
+    background-color: #535353;
+    color: #b3b3b3;
+}
+
+/* ===== Player bar ===== */
+QFrame#player-bar {
+    background-color: #181818;
+    border-top: 1px solid #282828;
+    min-height: 90px;
+    max-height: 90px;
+}
+
+/* ===== Botões do player ===== */
+QPushButton.player-btn {
+    background: transparent;
+    border: none;
+    color: #b3b3b3;
+    border-radius: 50%;
+    min-width: 32px;
+    min-height: 32px;
+}
+
+QPushButton.player-btn:hover { color: #FFFFFF; }
+
+QPushButton#btn-play-pause {
+    background-color: #FFFFFF;
+    color: #000000;
+    border-radius: 50%;
+    min-width: 38px;
+    min-height: 38px;
+}
+
+QPushButton#btn-play-pause:hover {
+    background-color: #1DB954;
+}
+
+/* ===== Progress bar ===== */
+QSlider#progress-slider::groove:horizontal {
+    height: 4px;
+    background: #535353;
+    border-radius: 2px;
+}
+
+QSlider#progress-slider::sub-page:horizontal {
+    background: #b3b3b3;
+    border-radius: 2px;
+}
+
+QSlider#progress-slider:hover::sub-page:horizontal {
+    background: #1DB954;
+}
+
+QSlider#progress-slider::handle:horizontal {
+    width: 12px;
+    height: 12px;
+    margin: -4px 0;
+    background: #FFFFFF;
+    border-radius: 6px;
+}
+
+/* ===== Scrollbar ===== */
+QScrollBar:vertical {
+    background: transparent;
+    width: 8px;
+}
+
+QScrollBar::handle:vertical {
+    background: #535353;
+    border-radius: 4px;
+    min-height: 30px;
+}
+
+QScrollBar::handle:vertical:hover { background: #b3b3b3; }
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical { height: 0; }
+
+/* ===== Cards / Painéis ===== */
+QFrame.card {
+    background-color: #181818;
+    border-radius: 12px;
+    padding: 16px;
+}
+
+QFrame.card:hover { background-color: #282828; }
+
+/* ===== Labels ===== */
+QLabel.section-title {
+    font-size: 20px;
+    font-weight: 700;
+    color: #FFFFFF;
+}
+
+QLabel.subtitle {
+    font-size: 12px;
+    color: #b3b3b3;
+}
+
+QLabel.muted {
+    color: #6a6a6a;
+    font-size: 11px;
+}
+
+/* ===== Toggle switch ===== */
+QCheckBox#toggle-penalize {
+    color: #b3b3b3;
+    font-size: 13px;
+}
+
+QCheckBox#toggle-penalize::indicator {
+    width: 40px;
+    height: 22px;
+    border-radius: 11px;
+    background: #535353;
+}
+
+QCheckBox#toggle-penalize::indicator:checked {
+    background: #1DB954;
+}
